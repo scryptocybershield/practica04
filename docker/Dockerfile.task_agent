@@ -1,0 +1,17 @@
+# Dockerfile para el agente consumidor de tareas RabbitMQ
+FROM php:8.3-cli
+
+# Instalar extensiones de PHP necesarias
+RUN docker-php-ext-install pdo pdo_mysql
+
+# Instalar Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Crear directorio de trabajo
+WORKDIR /app
+
+# Copiar archivos del agente
+COPY docker/task_agent.php /app/
+
+# Comando para ejecutar el agente
+CMD ["php", "task_agent.php"]

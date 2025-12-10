@@ -1,0 +1,20 @@
+# Dockerfile para servidor Apache con PHP
+FROM php:8.3-apache
+
+# Instalar extensiones de PHP básicas (sin PostgreSQL para simplificar)
+RUN docker-php-ext-install pdo pdo_mysql
+
+# Habilitar mod_rewrite para Apache
+RUN a2enmod rewrite
+
+# Configurar Apache para escuchar en el puerto 80
+RUN sed -i 's/Listen 80/Listen 80/' /etc/apache2/ports.conf
+
+# Crear un archivo de configuración para Apache
+RUN echo 'ServerName localhost' >> /etc/apache2/apache2.conf
+
+# Exponer el puerto 80
+EXPOSE 80
+
+# Comando para iniciar Apache
+CMD ["apache2-foreground"]

@@ -1,0 +1,256 @@
+version: '3.8'
+
+# ============================================
+# DOCKER COMPOSE - PRODUCCIÓN
+# ============================================
+# Este archivo usa imágenes pre-construidas de Docker Hub
+# Para desarrollo local, usa docker-compose.yml
+
+services:
+  # === 1. BALANCEADOR DE CARGA (Nginx) ===
+  loadbalancer:
+    image: nginx:alpine
+    container_name: practica4_loadbalancer
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - apache1
+      - apache2
+      - apache3
+    networks:
+      - frontend_net
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # === 2. FRONT-END (3 servidors Apache + PHP) ===
+  apache1:
+    image: ${DOCKERHUB_USER:-yourusername}/practica4-apache-php:${VERSION:-latest}
+    container_name: practica4_apache1
+    restart: unless-stopped
+    volumes:
+      - ./src/app1:/var/www/html:ro
+    environment:
+      - APP_NAME=App1
+    networks:
+      - frontend_net
+      - backend_net
+
+  apache2:
+    image: ${DOCKERHUB_USER:-yourusername}/practica4-apache-php:${VERSION:-latest}
+    container_name: practica4_apache2
+    restart: unless-stopped
+    volumes:
+      - ./src/app2:/var/www/html:ro
+    environment:
+      - APP_NAME=App2
+    networks:
+      - frontend_net
+      - backend_net
+
+  apache3:
+    image: ${DOCKERHUB_USER:-yourusername}/practica4-apache-php:${VERSION:-latest}
+    container_name: practica4_apache3
+    restart: unless-stopped
+    volumes:
+      - ./src/app3:/var/www/html:ro
+    environment:
+      - APP_NAME=App3
+    networks:
+      - frontend_net
+      - backend_net
+
+  # Almacenament d'objectes S3
+  minio:
+    image: minio/minio:latest
+    container_name: practica4_minio
+    restart: unless-stopped
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address :9001
+    networks:
+      - frontend_net
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # === 3. BACK-END ===
+  # Base de dades principal (escriptura)
+  postgres_write:
+    image: postgres:15-alpine
+    container_name: practica4_postgres_write
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-appuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-apppass}
+      - POSTGRES_DB=${POSTGRES_DB:-appdb}
+    volumes:
+      - postgres_write_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - backend_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-appuser}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Base de dades secundària (lectura)
+  postgres_read:
+    image: postgres:15-alpine
+    container_name: practica4_postgres_read
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-appuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-apppass}
+      - POSTGRES_DB=${POSTGRES_DB:-appdb}
+    volumes:
+      - postgres_read_data:/var/lib/postgresql/data
+    networks:
+      - backend_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-appuser}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Cache Redis
+  redis:
+    image: redis:alpine
+    container_name: practica4_redis
+    restart: unless-stopped
+    networks:
+      - backend_net
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Cua de missatges RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: practica4_rabbitmq
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-rabbituser}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-rabbitpass}
+    networks:
+      - backend_net
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Agent consumidor de tasques (PHP)
+  task_agent:
+    image: ${DOCKERHUB_USER:-yourusername}/practica4-task-agent:${VERSION:-latest}
+    container_name: practica4_task_agent
+    restart: unless-stopped
+    networks:
+      - backend_net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres_write:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # === 4. INTEL·LIGÈNCIA DE NEGOCI (Metabase) ===
+  metabase:
+    image: metabase/metabase:latest
+    container_name: practica4_metabase
+    restart: unless-stopped
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_HOST=postgres_bi
+      - MB_DB_PORT=5432
+      - MB_DB_DBNAME=metabase
+      - MB_DB_USER=metabase
+      - MB_DB_PASS=metabase
+    networks:
+      - bi_net
+    depends_on:
+      postgres_bi:
+        condition: service_healthy
+
+  # Base de dades de Metabase
+  postgres_bi:
+    image: postgres:15-alpine
+    container_name: practica4_postgres_bi
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=metabase
+      - POSTGRES_PASSWORD=metabase
+      - POSTGRES_DB=metabase
+    volumes:
+      - postgres_bi_data:/var/lib/postgresql/data
+    networks:
+      - bi_net
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U metabase" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === 5. APLICACIÓ HERETADA (Tomcat + MariaDB) ===
+  tomcat:
+    image: tomcat:9.0-jdk11-openjdk-slim
+    container_name: practica4_tomcat
+    restart: unless-stopped
+    volumes:
+      - ./legacy:/usr/local/tomcat/webapps/ROOT:ro
+    networks:
+      - legacy_net
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  mariadb:
+    image: mariadb:10.11
+    container_name: practica4_mariadb
+    restart: unless-stopped
+    environment:
+      - MARIADB_ROOT_PASSWORD=${LEGACY_DB_PASSWORD:-rootpass}
+      - MARIADB_DATABASE=legacy_db
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./db/init_legacy.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - legacy_net
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+  bi_net:
+    driver: bridge
+  legacy_net:
+    driver: bridge
+
+volumes:
+  minio_data:
+  postgres_write_data:
+  postgres_read_data:
+  postgres_bi_data:
+  mariadb_data:

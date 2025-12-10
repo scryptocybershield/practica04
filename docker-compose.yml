@@ -1,0 +1,179 @@
+version: '3.8'
+
+services:
+  # === 1. BALANCEADOR DE CARGA (Nginx) ===
+  loadbalancer:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - apache1
+      - apache2
+      - apache3
+    networks:
+      - frontend_net
+
+  # === 2. FRONT-END (3 servidors Apache + PHP) ===
+  apache1:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.apache
+    volumes:
+      - ./src/app1:/var/www/html:ro
+    environment:
+      - APP_NAME=App1
+    networks:
+      - frontend_net
+      - backend_net
+
+  apache2:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.apache
+    volumes:
+      - ./src/app2:/var/www/html:ro
+    environment:
+      - APP_NAME=App2
+    networks:
+      - frontend_net
+      - backend_net
+
+  apache3:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.apache
+    volumes:
+      - ./src/app3:/var/www/html:ro
+    environment:
+      - APP_NAME=App3
+    networks:
+      - frontend_net
+      - backend_net
+
+  # Almacenament d'objectes S3
+  minio:
+    image: minio/minio:latest
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address :9001
+    networks:
+      - frontend_net
+    volumes:
+      - minio_data:/data
+
+  # === 3. BACK-END ===
+  # Base de dades principal (escriptura)
+  postgres_write:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=apppass
+      - POSTGRES_DB=appdb
+    volumes:
+      - postgres_write_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - backend_net
+
+  # Base de dades secundària (lectura)
+  postgres_read:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=apppass
+      - POSTGRES_DB=appdb
+    volumes:
+      - postgres_read_data:/var/lib/postgresql/data
+    networks:
+      - backend_net
+
+  # Cache Redis
+  redis:
+    image: redis:alpine
+    networks:
+      - backend_net
+
+  # Cua de missatges RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      - RABBITMQ_DEFAULT_USER=rabbituser
+      - RABBITMQ_DEFAULT_PASS=rabbitpass
+    networks:
+      - backend_net
+
+  # Agent consumidor de tasques (PHP)
+  task_agent:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.task_agent
+    networks:
+      - backend_net
+    depends_on:
+      - rabbitmq
+      - postgres_write
+      - redis
+
+  # === 4. INTEL·LIGÈNCIA DE NEGOCI (Metabase) ===
+  metabase:
+    image: metabase/metabase:latest
+    environment:
+      - MB_DB_TYPE=postgres
+      - MB_DB_HOST=postgres_bi
+      - MB_DB_PORT=5432
+      - MB_DB_DBNAME=metabase
+      - MB_DB_USER=metabase
+      - MB_DB_PASS=metabase
+    networks:
+      - bi_net
+    ports:
+      - "3000:3000"
+
+  # Base de dades de Metabase
+  postgres_bi:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=metabase
+      - POSTGRES_PASSWORD=metabase
+      - POSTGRES_DB=metabase
+    volumes:
+      - postgres_bi_data:/var/lib/postgresql/data
+    networks:
+      - bi_net
+
+  # === 5. APLICACIÓ HERETADA (Tomcat + MariaDB) ===
+  tomcat:
+    image: tomcat:9.0-jdk11-openjdk-slim
+    volumes:
+      - ./legacy:/usr/local/tomcat/webapps/ROOT:ro
+    networks:
+      - legacy_net
+    ports:
+      - "8080:8080"
+
+  mariadb:
+    image: mariadb:10.11
+    environment:
+      - MARIADB_ROOT_PASSWORD=rootpass
+      - MARIADB_DATABASE=legacy_db
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./db/init_legacy.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - legacy_net
+
+networks:
+  frontend_net:
+  backend_net:
+  bi_net:
+  legacy_net:
+
+volumes:
+  minio_data:
+  postgres_write_data:
+  postgres_read_data:
+  postgres_bi_data:
+  mariadb_data:
