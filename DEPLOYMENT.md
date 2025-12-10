@@ -64,17 +64,17 @@ export VERSION=latest
 ### 4. Desplegar todos los servicios
 
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 ```
 
 ### 5. Verificar el estado
 
 ```bash
 # Ver estado de todos los servicios
-docker-compose -f docker-compose.prod.yml ps
+docker-compose ps
 
 # Ver logs
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose logs -f
 ```
 
 ## 🌐 Acceso a los Servicios
@@ -150,19 +150,19 @@ graph TB
 
 ```bash
 # Iniciar todos los servicios
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 
 # Detener todos los servicios
-docker-compose -f docker-compose.prod.yml down
+docker-compose down
 
 # Reiniciar un servicio específico
-docker-compose -f docker-compose.prod.yml restart apache1
+docker-compose restart apache1
 
 # Ver logs de un servicio
-docker-compose -f docker-compose.prod.yml logs -f loadbalancer
+docker-compose logs -f loadbalancer
 
 # Escalar servidores Apache (ejemplo: 5 instancias)
-docker-compose -f docker-compose.prod.yml up -d --scale apache1=5
+docker-compose up -d --scale apache1=5
 ```
 
 ### Mantenimiento
@@ -172,14 +172,14 @@ docker-compose -f docker-compose.prod.yml up -d --scale apache1=5
 docker stats
 
 # Limpiar contenedores detenidos
-docker-compose -f docker-compose.prod.yml down --remove-orphans
+docker-compose down --remove-orphans
 
 # Eliminar volúmenes ( BORRA DATOS)
-docker-compose -f docker-compose.prod.yml down -v
+docker-compose down -v
 
 # Actualizar imágenes
-docker-compose -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose pull
+docker-compose up -d
 ```
 
 ### Backup de datos
@@ -202,7 +202,7 @@ docker run --rm -v practica4_postgres_write_data:/data -v $(pwd):/backup alpine 
 Todos los servicios incluyen health checks. Verifica el estado:
 
 ```bash
-docker-compose -f docker-compose.prod.yml ps
+docker-compose ps
 ```
 
 Los servicios deben mostrar estado `healthy` o `running`.
@@ -230,13 +230,13 @@ curl -u rabbituser:rabbitpass http://localhost:15672/api/overview
 **Solución**:
 ```bash
 # Ver logs detallados
-docker-compose -f docker-compose.prod.yml logs
+docker-compose logs
 
 # Verificar puertos en uso
 sudo netstat -tulpn | grep -E ':(80|3000|8080)'
 
 # Reiniciar servicios
-docker-compose -f docker-compose.prod.yml restart
+docker-compose restart
 ```
 
 ### Problema: Error de conexión a base de datos
@@ -244,13 +244,13 @@ docker-compose -f docker-compose.prod.yml restart
 **Solución**:
 ```bash
 # Verificar que PostgreSQL está healthy
-docker-compose -f docker-compose.prod.yml ps postgres_write
+docker-compose ps postgres_write
 
 # Ver logs de PostgreSQL
-docker-compose -f docker-compose.prod.yml logs postgres_write
+docker-compose logs postgres_write
 
 # Reiniciar base de datos
-docker-compose -f docker-compose.prod.yml restart postgres_write
+docker-compose restart postgres_write
 ```
 
 ### Problema: Puerto 80 ya en uso
@@ -260,7 +260,7 @@ docker-compose -f docker-compose.prod.yml restart postgres_write
 # Opción 1: Detener servicio que usa el puerto
 sudo systemctl stop apache2  # o nginx
 
-# Opción 2: Cambiar puerto en docker-compose.prod.yml
+# Opción 2: Cambiar puerto en docker-compose.yml
 # Editar línea: - "8081:80"  # en lugar de "80:80"
 ```
 
@@ -284,11 +284,11 @@ echo $DOCKERHUB_USER
 **Solución**:
 ```bash
 # Detener servicios
-docker-compose -f docker-compose.prod.yml down
+docker-compose down
 
 # Eliminar volúmenes y recrear
-docker-compose -f docker-compose.prod.yml down -v
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose down -v
+docker-compose up -d
 ```
 
 ## 🔒 Seguridad
@@ -333,7 +333,7 @@ docker stats
 docker system df -v
 
 # Logs en tiempo real
-docker-compose -f docker-compose.prod.yml logs -f --tail=100
+docker-compose logs -f --tail=100
 ```
 
 ### Integración con Prometheus (opcional)
@@ -347,13 +347,13 @@ Ver documentación de monitoreo avanzado en `docs/monitoring.md`
 ```bash
 # 1. Descargar nuevas imágenes
 export VERSION=1.1.0
-docker-compose -f docker-compose.prod.yml pull
+docker-compose pull
 
 # 2. Recrear servicios
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 
 # 3. Verificar
-docker-compose -f docker-compose.prod.yml ps
+docker-compose ps
 ```
 
 ### Rollback a versión anterior
@@ -363,13 +363,13 @@ docker-compose -f docker-compose.prod.yml ps
 export VERSION=1.0.0
 
 # Recrear servicios
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose up -d
 ```
 
 ## 📞 Soporte
 
 Para problemas o preguntas:
-- Revisar logs: `docker-compose -f docker-compose.prod.yml logs`
+- Revisar logs: `docker-compose logs`
 - Consultar [ARCHITECTURE.md](ARCHITECTURE.md) para entender la arquitectura
 - Abrir issue en el repositorio
 
