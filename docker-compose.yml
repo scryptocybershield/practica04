@@ -3,7 +3,8 @@ version: '3.8'
 # ============================================
 # DOCKER COMPOSE - ARQUITECTURA COMPLETA
 # ============================================
-# Este archivo usa imágenes pre-construidas de Docker Hub
+# Imágenes de Docker Hub: s4lvaborjamoll/practica4-*
+# Para usar otra versión: export VERSION=1.0.0
 
 
 services:
@@ -30,7 +31,7 @@ services:
 
   # === 2. FRONT-END (3 servidors Apache + PHP) ===
   apache1:
-    image: ${DOCKERHUB_USER:-yourusername}/practica4-apache-php:${VERSION:-latest}
+    image: ${DOCKERHUB_USER:-s4lvaborjamoll}/practica4-apache-php:${VERSION:-latest}
     container_name: practica4_apache1
     restart: unless-stopped
     volumes:
@@ -42,7 +43,7 @@ services:
       - backend_net
 
   apache2:
-    image: ${DOCKERHUB_USER:-yourusername}/practica4-apache-php:${VERSION:-latest}
+    image: ${DOCKERHUB_USER:-s4lvaborjamoll}/practica4-apache-php:${VERSION:-latest}
     container_name: practica4_apache2
     restart: unless-stopped
     volumes:
@@ -54,7 +55,7 @@ services:
       - backend_net
 
   apache3:
-    image: ${DOCKERHUB_USER:-yourusername}/practica4-apache-php:${VERSION:-latest}
+    image: ${DOCKERHUB_USER:-s4lvaborjamoll}/practica4-apache-php:${VERSION:-latest}
     container_name: practica4_apache3
     restart: unless-stopped
     volumes:
@@ -155,7 +156,7 @@ services:
 
   # Agent consumidor de tasques (PHP)
   task_agent:
-    image: ${DOCKERHUB_USER:-yourusername}/practica4-task-agent:${VERSION:-latest}
+    image: ${DOCKERHUB_USER:-s4lvaborjamoll}/practica4-task-agent:${VERSION:-latest}
     container_name: practica4_task_agent
     restart: unless-stopped
     networks:
@@ -179,7 +180,7 @@ services:
       - MB_DB_PORT=5432
       - MB_DB_DBNAME=metabase
       - MB_DB_USER=metabase
-      - MB_DB_PASS=metabase
+      - MB_DB_PASS=${METABASE_DB_PASSWORD:-metabase}
     networks:
       - bi_net # Para su propia DB (metadata)
       - backend_net # Para acceder a postgres_read (datos de aplicación)
@@ -194,7 +195,7 @@ services:
     restart: unless-stopped
     environment:
       - POSTGRES_USER=metabase
-      - POSTGRES_PASSWORD=metabase
+      - POSTGRES_PASSWORD=${METABASE_DB_PASSWORD:-metabase}
       - POSTGRES_DB=metabase
     volumes:
       - postgres_bi_data:/var/lib/postgresql/data
