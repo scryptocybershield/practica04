@@ -5,10 +5,10 @@
 ```mermaid
 graph TB
     %% Cliente externo
-    CLIENTE[Cliente<br/>HTTP/HTTPS] --> LB[Balancejador<br/>Nginx:80]
+    CLIENTE[Cliente<br/>HTTP/HTTPS] --> LB[Balanceador<br/>Nginx:80]
 
-    %% Red web_net
-    subgraph "web_net - Red Externa"
+    %% Red frontend_net
+    subgraph "frontend_net - Red Frontend"
         LB --> APACHE1[Apache1:80<br/>App1]
         LB --> APACHE2[Apache2:80<br/>App2]
         LB --> APACHE3[Apache3:80<br/>App3]
@@ -18,8 +18,8 @@ graph TB
         APACHE3 --> MINIO
     end
 
-    %% Red app_net
-    subgraph "app_net - Red de Aplicación"
+    %% Red backend_net
+    subgraph "backend_net - Red Backend"
         APACHE1 --> REDIS[Redis<br/>Cache]
         APACHE2 --> REDIS
         APACHE3 --> REDIS
@@ -28,32 +28,22 @@ graph TB
         APACHE3 --> RABBIT
         AGENT[Task Agent<br/>PHP] --> RABBIT
         AGENT --> REDIS
-    end
-
-    %% Red functional_db_net
-    subgraph "functional_db_net - Red de Bases de Datos Funcionales"
         APACHE1 --> PG_WRITE[PostgreSQL Write<br/>Base Principal]
         APACHE2 --> PG_WRITE
         APACHE3 --> PG_WRITE
         AGENT --> PG_WRITE
         PG_WRITE -.-> PG_READ[PostgreSQL Read<br/>Réplica]
+    end
+
+    %% Red bi_net
+    subgraph "bi_net - Red Business Intelligence"
         METABASE[Metabase<br/>BI Tool] --> PG_BI[PostgreSQL BI<br/>Metabase DB]
     end
 
-    %% Red legacy_db_net
-    subgraph "legacy_db_net - Red de Aplicación Legacy"
+    %% Red legacy_net
+    subgraph "legacy_net - Red Legacy"
         TOMCAT[Tomcat<br/>Legacy App] --> MARIADB[MariaDB<br/>Legacy DB]
-        APACHE1 --> TOMCAT
-        APACHE2 --> TOMCAT
-        APACHE3 --> TOMCAT
-        METABASE --> TOMCAT
     end
-
-    %% Conexiones entre redes
-    APACHE1 -.-> AGENT
-    APACHE2 -.-> AGENT
-    APACHE3 -.-> AGENT
-    AGENT -.-> PG_BI
 
     %% Estilos
     classDef web fill:#e1f5fe
@@ -69,24 +59,24 @@ graph TB
 
 ## Descripción de la Microsegmentación
 
-### **web_net** - Red Externa
+### **frontend_net** - Red Frontend
 - **Servicios**: `loadbalancer`, `apache1`, `apache2`, `apache3`, `minio`
-- **Propósito**: Comunicación entre balanceador y front-end (único punto de acceso externo)
+- **Propósito**: Comunicación entre balanceador y servidores web front-end
 - **Puertos expuestos**: 80 (solo balanceador)
 
-### **app_net** - Red de Aplicación
-- **Servicios**: `apache1`, `apache2`, `apache3`, `redis`, `rabbitmq`, `task_agent`
-- **Propósito**: Comunicación interna entre componentes de aplicación (cache, colas, almacenamiento)
+### **backend_net** - Red Backend
+- **Servicios**: `apache1`, `apache2`, `apache3`, `redis`, `rabbitmq`, `task_agent`, `postgres_write`, `postgres_read`
+- **Propósito**: Comunicación interna entre componentes de aplicación (cache, colas, bases de datos)
 - **Sin acceso externo directo**
 
-### **functional_db_net** - Red de Bases de Datos Funcionales
-- **Servicios**: `postgres_write`, `postgres_read`, `postgres_bi`, `metabase`, `task_agent`, `apache1`, `apache2`, `apache3`
-- **Propósito**: Comunicación con bases de datos funcionales (Apache accede a PostgreSQL para gestión de datos)
-- **Aislamiento**: Solo servicios autorizados pueden acceder
+### **bi_net** - Red Business Intelligence
+- **Servicios**: `metabase`, `postgres_bi`
+- **Propósito**: Aislamiento de herramientas de inteligencia de negocio
+- **Sin acceso externo directo**
 
-### **legacy_db_net** - Red de Aplicación Legacy
-- **Servicios**: `tomcat`, `mariadb`, `apache1`, `apache2`, `apache3`, `metabase`
-- **Propósito**: Aislamiento de sistema heredado con acceso controlado (Apache y Metabase consultan API Tomcat)
+### **legacy_net** - Red Legacy
+- **Servicios**: `tomcat`, `mariadb`
+- **Propósito**: Aislamiento de sistema heredado
 - **Sin acceso externo directo**
 
 ## Puertos y Accesos
@@ -98,17 +88,15 @@ graph TB
 
 ## Flujo de Comunicación
 
-1. **Cliente → Nginx (web_net)** - Entrada principal
-2. **Nginx → Apache (web_net)** - Balanceo de carga
-3. **Apache → Redis/RabbitMQ (app_net)** - Cache y colas
-4. **Apache → MinIO (web_net)** - Almacenamiento de objetos
-5. **Apache → PostgreSQL (functional_db_net)** - Base de datos principal
-6. **Apache → Tomcat (legacy_db_net)** - Consulta API heredada
-7. **Task Agent → RabbitMQ (app_net)** - Consumo de tareas
-8. **Task Agent → PostgreSQL (functional_db_net)** - Procesamiento de datos
-9. **Metabase → PostgreSQL BI (functional_db_net)** - Análisis de datos
-10. **Metabase → Tomcat (legacy_db_net)** - Consulta datos legacy
-11. **Tomcat → MariaDB (legacy_db_net)** - Aplicación heredada
+1. **Cliente → Nginx (frontend_net)** - Entrada principal
+2. **Nginx → Apache (frontend_net)** - Balanceo de carga
+3. **Apache → MinIO (frontend_net)** - Almacenamiento de objetos
+4. **Apache → Redis/RabbitMQ (backend_net)** - Cache y colas
+5. **Apache → PostgreSQL (backend_net)** - Base de datos principal
+6. **Task Agent → RabbitMQ (backend_net)** - Consumo de tareas
+7. **Task Agent → PostgreSQL (backend_net)** - Procesamiento de datos
+8. **Metabase → PostgreSQL BI (bi_net)** - Análisis de datos
+9. **Tomcat → MariaDB (legacy_net)** - Aplicación heredada
 
 ## Beneficios de la Microsegmentación
 
