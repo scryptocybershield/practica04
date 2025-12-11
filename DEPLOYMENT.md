@@ -111,28 +111,40 @@ Una vez desplegado, solo el balanceador de carga estará accesible externamente:
 ```mermaid
 graph TB
     CLIENT[Cliente] --> LB[Nginx<br/>Balanceador]
-    LB --> A1[Apache 1]
-    LB --> A2[Apache 2]
-    LB --> A3[Apache 3]
     
-    A1 & A2 & A3 --> MINIO[MinIO<br/>S3 Storage]
-    A1 & A2 & A3 --> REDIS[Redis<br/>Cache]
-    A1 & A2 & A3 --> RABBIT[RabbitMQ<br/>Queue]
-    A1 & A2 & A3 --> PG_W[PostgreSQL<br/>Write]
+    subgraph "frontend_net"
+        LB --> A1[Apache 1]
+        LB --> A2[Apache 2]
+        LB --> A3[Apache 3]
+        A1 & A2 & A3 --> MINIO[MinIO<br/>S3 Storage]
+    end
     
-    RABBIT --> AGENT[Task Agent]
-    AGENT --> PG_W
+    subgraph "backend_net"
+        A1 & A2 & A3 --> REDIS[Redis<br/>Cache]
+        A1 & A2 & A3 --> RABBIT[RabbitMQ<br/>Queue]
+        A1 & A2 & A3 --> PG_W[PostgreSQL<br/>Write]
+        
+        RABBIT --> AGENT[Task Agent]
+        AGENT --> PG_W
+        
+        PG_W -.Replicación.-> PG_R[PostgreSQL<br/>Read]
+        
+        MB[Metabase] --> PG_R
+    end
     
-    PG_W -.-> PG_R[PostgreSQL<br/>Read]
+    subgraph "bi_net"
+        MB --> PG_BI[PostgreSQL<br/>BI]
+    end
     
-    MB[Metabase] --> PG_BI[PostgreSQL<br/>BI]
-    
-    TOMCAT[Tomcat] --> MARIA[MariaDB]
+    subgraph "legacy_net"
+        TOMCAT[Tomcat] --> MARIA[MariaDB]
+    end
     
     style LB fill:#e1f5fe
     style A1 fill:#e1f5fe
     style A2 fill:#e1f5fe
     style A3 fill:#e1f5fe
+    style MINIO fill:#e1f5fe
     style REDIS fill:#f3e5f5
     style RABBIT fill:#f3e5f5
     style AGENT fill:#f3e5f5
