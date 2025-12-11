@@ -181,7 +181,8 @@ services:
       - MB_DB_USER=metabase
       - MB_DB_PASS=metabase
     networks:
-      - bi_net
+      - bi_net # Para su propia DB (metadata)
+      - backend_net # Para acceder a postgres_read (datos de aplicación)
     depends_on:
       postgres_bi:
         condition: service_healthy

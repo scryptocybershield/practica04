@@ -33,11 +33,12 @@ graph TB
         APACHE3 --> PG_WRITE
         AGENT --> PG_WRITE
         PG_WRITE -.-> PG_READ[PostgreSQL Read<br/>Réplica]
+        METABASE[Metabase<br/>BI Tool] --> PG_READ
     end
 
     %% Red bi_net
     subgraph "bi_net - Red Business Intelligence"
-        METABASE[Metabase<br/>BI Tool] --> PG_BI[PostgreSQL BI<br/>Metabase DB]
+        METABASE --> PG_BI[PostgreSQL BI<br/>Metabase DB]
     end
 
     %% Red legacy_net
@@ -65,13 +66,13 @@ graph TB
 - **Puertos expuestos**: 80 (solo balanceador)
 
 ### **backend_net** - Red Backend
-- **Servicios**: `apache1`, `apache2`, `apache3`, `redis`, `rabbitmq`, `task_agent`, `postgres_write`, `postgres_read`
+- **Servicios**: `apache1`, `apache2`, `apache3`, `redis`, `rabbitmq`, `task_agent`, `postgres_write`, `postgres_read`, `metabase`
 - **Propósito**: Comunicación interna entre componentes de aplicación (cache, colas, bases de datos)
 - **Sin acceso externo directo**
 
 ### **bi_net** - Red Business Intelligence
 - **Servicios**: `metabase`, `postgres_bi`
-- **Propósito**: Aislamiento de herramientas de inteligencia de negocio
+- **Propósito**: Aislamiento de base de datos de metadata de Metabase
 - **Sin acceso externo directo**
 
 ### **legacy_net** - Red Legacy
@@ -92,11 +93,13 @@ graph TB
 2. **Nginx → Apache (frontend_net)** - Balanceo de carga
 3. **Apache → MinIO (frontend_net)** - Almacenamiento de objetos
 4. **Apache → Redis/RabbitMQ (backend_net)** - Cache y colas
-5. **Apache → PostgreSQL (backend_net)** - Base de datos principal
+5. **Apache → PostgreSQL Write (backend_net)** - Base de datos principal
 6. **Task Agent → RabbitMQ (backend_net)** - Consumo de tareas
-7. **Task Agent → PostgreSQL (backend_net)** - Procesamiento de datos
-8. **Metabase → PostgreSQL BI (bi_net)** - Análisis de datos
-9. **Tomcat → MariaDB (legacy_net)** - Aplicación heredada
+7. **Task Agent → PostgreSQL Write (backend_net)** - Procesamiento de datos
+8. **PostgreSQL Write → PostgreSQL Read (backend_net)** - Replicación de datos
+9. **Metabase → PostgreSQL Read (backend_net)** - Análisis de datos de aplicación
+10. **Metabase → PostgreSQL BI (bi_net)** - Metadata de Metabase
+11. **Tomcat → MariaDB (legacy_net)** - Aplicación heredada
 
 ## Beneficios de la Microsegmentación
 
