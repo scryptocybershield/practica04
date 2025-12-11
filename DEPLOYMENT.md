@@ -44,24 +44,16 @@ nano .env
 > ./generate_secrets.sh
 > ```
 
-### 3. Configurar usuario de Docker Hub
-
-Edita el archivo `.env` y añade:
+### 3. Desplegar todos los servicios
 
 ```bash
-# Docker Hub Configuration
-DOCKERHUB_USER=yourusername
-VERSION=latest
+docker-compose up -d
 ```
 
-O exporta las variables:
+> [!NOTE]
+> Las imágenes de Docker Hub (`s4lvaborjamoll/practica4-*`) se descargarán automáticamente la primera vez.
 
-```bash
-export DOCKERHUB_USER=yourusername
-export VERSION=latest
-```
-
-### 4. Desplegar todos los servicios
+### 4. Verificar el estado
 
 ```bash
 docker-compose up -d
