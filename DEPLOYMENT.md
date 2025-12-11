@@ -56,12 +56,6 @@ docker-compose up -d
 ### 4. Verificar el estado
 
 ```bash
-docker-compose up -d
-```
-
-### 5. Verificar el estado
-
-```bash
 # Ver estado de todos los servicios
 docker-compose ps
 
