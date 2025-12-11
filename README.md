@@ -5,7 +5,7 @@ Esta práctica implementa una arquitectura web completa utilizando Docker Compos
 
 ## Arquitectura
 
-### 1. Balancejador de Càrrega (Nginx)
+### 1. Balanceador de carga (Nginx)
 - Servicio: `loadbalancer`
 - Puerto: 80
 - Función: Distribuye la carga entre los 3 servidores Apache
