@@ -4,7 +4,7 @@ version: '3.8'
 # DOCKER COMPOSE - ARQUITECTURA COMPLETA
 # ============================================
 # Este archivo usa imágenes pre-construidas de Docker Hub
-# Configurar: export DOCKERHUB_USER=s4lvaborjamoll
+
 
 services:
   # === 1. BALANCEADOR DE CARGA (Nginx) ===
